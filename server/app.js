@@ -29,9 +29,9 @@ async function createApp() {
   app.use("/js", express.static(path.join(__dirname, "..", "public", "js")));
 
   app.use(async (request, response, next) => {
-    const sessionId = request.cookies.sid;
+    const sessionId = request.cookies.sid; //looks up session in database, finds user and attatches it to request.currentuser
 
-    if (!sessionId) {
+    if (!sessionId) { //if sessionID is empty, then request.currentUser is null. This checks whether session maps to valid user
       request.currentUser = null;
       next();
       return;
@@ -65,8 +65,8 @@ async function createApp() {
     next();
   });
 
-  function requireAuth(request, response, next) {
-    if (!request.currentUser) {
+  function requireAuth(request, response, next) { 
+    if (!request.currentUser) { //Based on cookie, requireauth checks whether user exists
       response.status(401).json({ error: "Authentication required." });
       return;
     }
@@ -227,6 +227,11 @@ async function createApp() {
   });
 
   app.get("/api/admin/users", requireAuth, async (_request, response) => {
+    if (_request.currentUser.role !== 'admin') {
+      //deny
+      response.status(403).json({ error: "Invalid role." });
+      return;
+    }
     const users = await db.all(`
       SELECT
         users.id,
