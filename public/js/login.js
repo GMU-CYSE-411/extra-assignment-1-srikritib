@@ -1,12 +1,4 @@
-(function setupFixationHelper() {
-  const params = new URLSearchParams(window.location.search);
-  const fixedSession = params.get("sid");
-
-  if (fixedSession) {
-    document.cookie = `sid=${fixedSession}; path=/`;
-  }
-})();
-
+//remove sid logic as the code takes value from URL (which attacker can manipulate) and writes it into session cookie
 document.getElementById("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
 
