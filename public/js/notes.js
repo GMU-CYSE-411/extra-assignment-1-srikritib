@@ -1,4 +1,4 @@
-=function escapeHtml(vals) { //for innerhtml to textcontent
+function escapeHtml(vals) { //for innerhtml to textcontent
   return String(vals)
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
