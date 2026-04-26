@@ -1,3 +1,12 @@
+=function escapeHtml(vals) { //for innerhtml to textcontent
+  return String(vals)
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
+}
+
 async function loadSettings(userId) {
   const result = await api(`/api/settings?userId=${encodeURIComponent(userId)}`);
   const settings = result.settings;
@@ -10,9 +19,9 @@ async function loadSettings(userId) {
   form.elements.theme.value = settings.theme;
   form.elements.statusMessage.value = settings.statusMessage;
   form.elements.emailOptIn.checked = Boolean(settings.emailOptIn);
-  document.getElementById("status-preview").innerHTML = `
-    <p><strong>${settings.displayName}</strong></p>
-    <p>${settings.statusMessage}</p>
+  document.getElementById("status-preview").innerHTML = ` //innerhtml is ok with escapehtml
+    <p><strong>${escapeHtml(settings.displayName)}</strong></p>
+    <p>${escapeHtml(settings.statusMessage)}</p>
   `;
 
   writeJson("settings-output", settings);
@@ -61,11 +70,17 @@ document.getElementById("settings-form").addEventListener("submit", async (event
 });
 
 document.getElementById("enable-email").addEventListener("click", async () => {
-  const result = await api("/api/settings/toggle-email?enabled=1");
+  const result = await api("/api/settings/toggle-email", {
+    method: "POST", 
+    body: JSON.stringify({enabled: 1}) //There is a state changing action
+  });
   writeJson("settings-output", result);
 });
 
 document.getElementById("disable-email").addEventListener("click", async () => {
-  const result = await api("/api/settings/toggle-email?enabled=0");
+  const result = await api("/api/settings/toggle-email", {
+    method: "POST",
+    body: JSON.stringify({enabled: 0}) //There is a state changing action
+  });
   writeJson("settings-output", result);
 });
