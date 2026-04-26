@@ -5,7 +5,7 @@ const cookieParser = require("cookie-parser");
 const { DEFAULT_DB_FILE, openDatabase } = require("../db");
 
 function sendPublicFile(response, fileName) {
-  response.sendFile(path.join(__dirname, "..", "public", fileName));
+  response.sendFile(path.join(__dirname, "..", "public", fileName)); //No Path traversal weakness as filename is called later on through app.get
 }
 
 function createSessionId() {
@@ -74,7 +74,7 @@ async function createApp() {
     next();
   }
 
-  app.get("/", (_request, response) => sendPublicFile(response, "index.html"));
+  app.get("/", (_request, response) => sendPublicFile(response, "index.html")); //calls these files under filename for sendPublicFile(), so attacker cannot input any file names because the filenames are already input from the code. 
   app.get("/login", (_request, response) => sendPublicFile(response, "login.html"));
   app.get("/notes", (_request, response) => sendPublicFile(response, "notes.html"));
   app.get("/settings", (_request, response) => sendPublicFile(response, "settings.html"));
@@ -84,23 +84,23 @@ async function createApp() {
     response.json({ user: request.currentUser });
   });
 
-  app.post("/api/login", async (request, response) => {
+  app.post("/api/login", async (request, response) => { 
     const username = String(request.body.username || "");
     const password = String(request.body.password || "");
 
     const query = `
       SELECT id, username, role, display_name
       FROM users
-      WHERE username = '${username}' AND password = '${password}'
+      WHERE username = ? AND password = ? //injection weakness where attacker put a string to get confidential data from this code 
     `;
-    const user = await db.get(query);
+    const user = await db.get(query, [username, password]); //no longer injection weakness as there is parameter for username and password, and ? is the placeholder in the code for these parameters
 
     if (!user) {
       response.status(401).json({ error: "Invalid username or password." });
       return;
     }
 
-    const sessionId = request.cookies.sid || createSessionId();
+    const sessionId = createSessionId(); //request.cookies.sid reuses the cookie for the user when they logged in, this is unsafe, a new cookie value needs to be issued 
 
     await db.run("DELETE FROM sessions WHERE id = ?", [sessionId]);
     await db.run(
@@ -109,6 +109,8 @@ async function createApp() {
     );
 
     response.cookie("sid", sessionId, {
+      httpOnly: true,
+      sameSite: 'Strict',
       path: "/"
     });
 
@@ -133,7 +135,7 @@ async function createApp() {
   });
 
   app.get("/api/notes", requireAuth, async (request, response) => {
-    const ownerId = request.query.ownerId || request.currentUser.id;
+    const ownerId = request.currentUser.id; //remove request.query.ownerID because code prioritizes user request over server side input on owner id.
     const search = request.query.search || "";
 
     const notes = await db.all(`
@@ -147,16 +149,16 @@ async function createApp() {
         notes.created_at AS createdAt
       FROM notes
       JOIN users ON users.id = notes.owner_id
-      WHERE notes.owner_id = ${ownerId}
-        AND (notes.title LIKE '%${search}%' OR notes.body LIKE '%${search}%')
+      WHERE notes.owner_id = ?
+        AND (notes.title LIKE ? OR notes.body LIKE ?) //injection, attacker can place string where this code can retrive confidential info
       ORDER BY notes.pinned DESC, notes.id DESC
-    `);
+    `, [ownerId, `%${search}%`, `%${search}%`]); //fixed injection through placeholders (?) and parameters in []
 
     response.json({ notes });
   });
 
   app.post("/api/notes", requireAuth, async (request, response) => {
-    const ownerId = Number(request.body.ownerId || request.currentUser.id);
+    const ownerId = Number(request.currentUser.id); //remove user request id for user input, this only gets input from server
     const title = String(request.body.title || "");
     const body = String(request.body.body || "");
     const pinned = request.body.pinned ? 1 : 0;
@@ -173,7 +175,7 @@ async function createApp() {
   });
 
   app.get("/api/settings", requireAuth, async (request, response) => {
-    const userId = Number(request.query.userId || request.currentUser.id);
+    const userId = Number(request.currentUser.id); //remove request.query.userID because code prioritizes user request over server side input on user id.
 
     const settings = await db.get(
       `
@@ -196,7 +198,7 @@ async function createApp() {
   });
 
   app.post("/api/settings", requireAuth, async (request, response) => {
-    const userId = Number(request.body.userId || request.currentUser.id);
+    const userId = Number(request.currentUser.id); //remove user request id for user input, this only gets input from server
     const displayName = String(request.body.displayName || "");
     const statusMessage = String(request.body.statusMessage || "");
     const theme = String(request.body.theme || "classic");
@@ -211,8 +213,8 @@ async function createApp() {
     response.json({ ok: true });
   });
 
-  app.get("/api/settings/toggle-email", requireAuth, async (request, response) => {
-    const enabled = request.query.enabled === "1" ? 1 : 0;
+  app.post("/api/settings/toggle-email", requireAuth, async (request, response) => { //get is supposed to get data, show settings, post creates forms, saves settings)
+    const enabled = request.body.enabled === "1" ? 1 : 0; //want to get enabled from body of post payload, not from URL (as with request.query.enabled)
 
     await db.run("UPDATE settings SET email_opt_in = ? WHERE user_id = ?", [
       enabled,
