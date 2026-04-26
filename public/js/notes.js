@@ -1,9 +1,18 @@
-function noteCard(note) {
+=function escapeHtml(vals) { //for innerhtml to textcontent
+  return String(vals)
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
+}
+
+function noteCard(note) { //tags will show up as text for document command, so use escapehtml
   return `
     <article class="note-card">
-      <h3>${note.title}</h3>
-      <p class="note-meta">Owner: ${note.ownerUsername} | ID: ${note.id} | Pinned: ${note.pinned}</p>
-      <div class="note-body">${note.body}</div>
+      <h3>${escapeHtml(note.title)}</h3>
+      <p class="note-meta">Owner: ${escapeHtml(note.ownerUsername)} | ID: ${escapeHtml(note.id)} | Pinned: ${escapeHtml(note.pinned)}</p>
+      <div class="note-body">${escapeHtml(note.body)}</div>
     </article>
   `;
 }
@@ -21,7 +30,7 @@ async function loadNotes(ownerId, search) {
 
   const result = await api(`/api/notes?${query.toString()}`);
   const notesList = document.getElementById("notes-list");
-  notesList.innerHTML = result.notes.map(noteCard).join("");
+  notesList.innerHTML = result.notes.map(noteCard).join(""); //safer to use innerhtml bc of escapehtml
 }
 
 (async function bootstrapNotes() {
